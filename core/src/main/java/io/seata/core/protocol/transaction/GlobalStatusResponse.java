@@ -15,15 +15,17 @@
  */
 package io.seata.core.protocol.transaction;
 
+import io.seata.core.protocol.MessageType;
+
 /**
  * The type Global status response.
  *
- * @author jimin.jm @alibaba-inc.com
+ * @author slievrly
  */
 public class GlobalStatusResponse extends AbstractGlobalEndResponse {
 
     @Override
     public short getTypeCode() {
-        return TYPE_GLOBAL_STATUS_RESULT;
+        return MessageType.TYPE_GLOBAL_STATUS_RESULT;
     }
 }

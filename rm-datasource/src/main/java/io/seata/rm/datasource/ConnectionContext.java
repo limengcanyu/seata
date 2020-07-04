@@ -33,7 +33,10 @@ public class ConnectionContext {
     private String xid;
     private Long branchId;
     private boolean isGlobalLockRequire;
-    //table and primary key should not be duplicated
+
+    /**
+     * Table and primary key should not be duplicated.
+     */
     private Set<String> lockKeysBuffer = new HashSet<>();
     private List<SQLUndoLog> sqlUndoItemsBuffer = new ArrayList<>();
 
@@ -115,7 +118,7 @@ public class ConnectionContext {
      * @return the boolean
      */
     public boolean hasUndoLog() {
-        return sqlUndoItemsBuffer.size() > 0;
+        return !sqlUndoItemsBuffer.isEmpty();
     }
 
     /**
@@ -154,14 +157,12 @@ public class ConnectionContext {
         this.branchId = branchId;
     }
 
+
     /**
      * Reset.
      */
-    void reset() {
-        xid = null;
-        branchId = null;
-        lockKeysBuffer.clear();
-        sqlUndoItemsBuffer.clear();
+    public void reset() {
+        this.reset(null);
     }
 
     /**
@@ -172,6 +173,7 @@ public class ConnectionContext {
     void reset(String xid) {
         this.xid = xid;
         branchId = null;
+        this.isGlobalLockRequire = false;
         lockKeysBuffer.clear();
         sqlUndoItemsBuffer.clear();
     }
@@ -203,6 +205,15 @@ public class ConnectionContext {
      */
     public List<SQLUndoLog> getUndoItems() {
         return sqlUndoItemsBuffer;
+    }
+
+    /**
+     * Gets lock keys buffer.
+     *
+     * @return the lock keys buffer
+     */
+    public Set<String> getLockKeysBuffer() {
+        return lockKeysBuffer;
     }
 
     @Override

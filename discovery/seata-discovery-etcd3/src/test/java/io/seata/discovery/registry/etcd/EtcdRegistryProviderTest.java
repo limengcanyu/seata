@@ -15,15 +15,14 @@
  */
 package io.seata.discovery.registry.etcd;
 
-import io.seata.discovery.registery.etcd.EtcdRegistryProvider;
-import io.seata.discovery.registery.etcd.EtcdRegistryServiceImpl;
+import io.seata.discovery.registry.etcd3.EtcdRegistryProvider;
+import io.seata.discovery.registry.etcd3.EtcdRegistryServiceImpl;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author xingfudeshi@gmail.com
- * @date 2019/04/26
  * the type etcd registry provider test
  */
 public class EtcdRegistryProviderTest {

@@ -15,73 +15,23 @@
  */
 package io.seata.rm.datasource.undo;
 
-import io.seata.rm.datasource.sql.SQLType;
-import io.seata.rm.datasource.sql.struct.ColumnMeta;
+import io.seata.rm.datasource.SqlGenerateUtils;
+import io.seata.sqlparser.SQLType;
 import io.seata.rm.datasource.sql.struct.Field;
 import io.seata.rm.datasource.sql.struct.Row;
 import io.seata.rm.datasource.sql.struct.TableMeta;
 import io.seata.rm.datasource.sql.struct.TableRecords;
-import org.apache.commons.dbcp.BasicDataSource;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * @author Geng Zhang
  */
-public class AbstractUndoExecutorTest extends BaseExecutorTest {
-
-    static BasicDataSource dataSource = null;
-
-    static Connection connection = null;
-
-    static TableMeta tableMeta = null;
-
-    @BeforeAll
-    public static void start() throws SQLException {
-        dataSource = new BasicDataSource();
-        dataSource.setDriverClassName("org.h2.Driver");
-        dataSource.setUrl("jdbc:h2:./db_store/test_undo");
-        dataSource.setUsername("sa");
-        dataSource.setPassword("");
-
-        connection = dataSource.getConnection();
-
-        tableMeta = mockTableMeta();
-    }
-
-    @AfterAll
-    public static void stop() {
-        if (connection != null) {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-            }
-        }
-        if (dataSource != null) {
-            try {
-                dataSource.close();
-            } catch (SQLException e) {
-            }
-        }
-    }
-
-    @BeforeEach
-    private void prepareTable() {
-        execSQL("DROP TABLE table_name");
-        execSQL("CREATE TABLE table_name ( `id` int(8), `name` varchar(64), PRIMARY KEY (`id`))");
-    }
+public class AbstractUndoExecutorTest extends BaseH2Test {
 
     @Test
     public void dataValidationUpdate() throws SQLException {
@@ -210,7 +160,7 @@ public class AbstractUndoExecutorTest extends BaseExecutorTest {
     @Test
     public void testParsePK() {
         TableMeta tableMeta = Mockito.mock(TableMeta.class);
-        Mockito.when(tableMeta.getPkName()).thenReturn("id");
+        Mockito.when(tableMeta.getPrimaryKeyOnlyName()).thenReturn(Arrays.asList(new String[]{"id"}));
         Mockito.when(tableMeta.getTableName()).thenReturn("table_name");
 
         TableRecords beforeImage = new TableRecords();
@@ -236,64 +186,46 @@ public class AbstractUndoExecutorTest extends BaseExecutorTest {
         sqlUndoLog.setAfterImage(null);
 
         TestUndoExecutor executor = new TestUndoExecutor(sqlUndoLog, true);
-        Object[] pkValues = executor.parsePkValues(beforeImage);
-        Assertions.assertEquals(2, pkValues.length);
+        Map<String,List<Field>> pkValues = executor.parsePkValues(beforeImage);
+        Assertions.assertEquals(2, pkValues.get("id").size());
     }
 
+    @Test
+    public void testBuildWhereConditionByPKs() throws SQLException {
+        List<String> pkNameList =new ArrayList<>();
+        pkNameList.add("id1");
+        pkNameList.add("id2");
 
-    private static TableMeta mockTableMeta() {
-        TableMeta tableMeta = Mockito.mock(TableMeta.class);
-        Mockito.when(tableMeta.getPkName()).thenReturn("ID");
-        Mockito.when(tableMeta.getTableName()).thenReturn("table_name");
-        ColumnMeta meta0 = Mockito.mock(ColumnMeta.class);
-        Mockito.when(meta0.getDataType()).thenReturn(Types.INTEGER);
-        Mockito.when(meta0.getColumnName()).thenReturn("ID");
-        Mockito.when(tableMeta.getColumnMeta("ID")).thenReturn(meta0);
-        ColumnMeta meta1 = Mockito.mock(ColumnMeta.class);
-        Mockito.when(meta1.getDataType()).thenReturn(Types.VARCHAR);
-        Mockito.when(meta1.getColumnName()).thenReturn("NAME");
-        Mockito.when(tableMeta.getColumnMeta("NAME")).thenReturn(meta1);
-        return tableMeta;
+        Map<String,List<Field>> pkRowValues = new HashMap<>();
+        List<Field> pkId1Values= new ArrayList<>();
+        pkId1Values.add(new Field());
+        pkId1Values.add(new Field());
+        pkId1Values.add(new Field());
+        List<Field> pkId2Values= new ArrayList<>();
+        pkId2Values.add(new Field());
+        pkId2Values.add(new Field());
+        pkId2Values.add(new Field());
+        pkRowValues.put("id1",pkId1Values);
+        pkRowValues.put("id2",pkId2Values);
+
+        String sql=SqlGenerateUtils.buildWhereConditionByPKs(pkNameList,pkRowValues.get("id1").size(),"mysql");
+        Assertions.assertEquals(" (id1,id2 ) in (  (?,?) , (?,?) , (?,?)  )",sql);
     }
 
-    private void execSQL(String sql) {
-        Statement s = null;
-        try {
-            s = connection.createStatement();
-            s.execute(sql);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            if (s != null) {
-                try {
-                    s.close();
-                } catch (SQLException e) {
-                }
-            }
-        }
-    }
+    @Test
+    public void testBuildWhereConditionByPK() throws SQLException {
+        List<String> pkNameList =new ArrayList<>();
+        pkNameList.add("id1");
 
-    private TableRecords execQuery(TableMeta tableMeta, String sql) throws SQLException {
-        Statement s = null;
-        ResultSet set = null;
-        try {
-            s = connection.createStatement();
-            set = s.executeQuery(sql);
-            return TableRecords.buildRecords(tableMeta, set);
-        } finally {
-            if (set != null) {
-                try {
-                    set.close();
-                } catch (Exception e) {
-                }
-            }
-            if (s != null) {
-                try {
-                    s.close();
-                } catch (SQLException e) {
-                }
-            }
-        }
+        Map<String,List<Field>> pkRowValues = new HashMap<>();
+        List<Field> pkId1Values= new ArrayList<>();
+        pkId1Values.add(new Field());
+        List<Field> pkId2Values= new ArrayList<>();
+        pkId2Values.add(new Field());
+        pkRowValues.put("id1",pkId1Values);
+
+        String sql=SqlGenerateUtils.buildWhereConditionByPKs(pkNameList,pkRowValues.get("id1").size(),"mysql");
+        Assertions.assertEquals(" (id1 ) in (  (?)  )",sql);
     }
 }
 

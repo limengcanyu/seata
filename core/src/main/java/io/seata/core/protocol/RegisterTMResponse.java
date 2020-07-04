@@ -20,11 +20,9 @@ import java.io.Serializable;
 /**
  * The type Register tm response.
  *
- * @author jimin.jm @alibaba-inc.com
- * @date 2018 /10/15
+ * @author slievrly
  */
 public class RegisterTMResponse extends AbstractIdentifyResponse implements Serializable {
-    private static final long serialVersionUID = 3629846050062228749L;
 
     /**
      * Instantiates a new Register tm response.
@@ -45,6 +43,6 @@ public class RegisterTMResponse extends AbstractIdentifyResponse implements Seri
 
     @Override
     public short getTypeCode() {
-        return TYPE_REG_CLT_RESULT;
+        return MessageType.TYPE_REG_CLT_RESULT;
     }
 }

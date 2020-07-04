@@ -15,12 +15,13 @@
  */
 package io.seata.core.protocol.transaction;
 
-import java.nio.ByteBuffer;
+import io.seata.core.protocol.MessageType;
+
 
 /**
  * The type Global lock query response.
  *
- * @author jimin.jm @alibaba-inc.com
+ * @author slievrly
  */
 public class GlobalLockQueryResponse extends AbstractTransactionResponse {
 
@@ -46,18 +47,7 @@ public class GlobalLockQueryResponse extends AbstractTransactionResponse {
 
     @Override
     public short getTypeCode() {
-        return TYPE_GLOBAL_LOCK_QUERY_RESULT;
+        return MessageType.TYPE_GLOBAL_LOCK_QUERY_RESULT;
     }
 
-    @Override
-    protected void doEncode() {
-        super.doEncode();
-        byteBuffer.putShort((short)(lockable ? 1 : 0));
-    }
-
-    @Override
-    public void decode(ByteBuffer byteBuffer) {
-        super.decode(byteBuffer);
-        this.lockable = byteBuffer.getShort() == 1;
-    }
 }

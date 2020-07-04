@@ -15,35 +15,31 @@
  */
 package io.seata.core.store;
 
+import java.util.Date;
 
 import io.seata.common.util.StringUtils;
 import io.seata.core.model.BranchStatus;
-
-import java.util.Date;
 
 /**
  * branch transaction data object
  *
  * @author zhangsen
- * @data 2019 /3/26
  */
 public class BranchTransactionDO {
 
     private String xid;
 
-    private long transactionId;
+    private Long transactionId;
 
-    private long branchId;
+    private Long branchId;
 
     private String resourceGroupId;
 
     private String resourceId;
 
-    private String lockKey;
-
     private String branchType;
 
-    private int status = BranchStatus.Unknown.getCode();
+    private Integer status = BranchStatus.Unknown.getCode();
 
     private String clientId;
 
@@ -141,24 +137,6 @@ public class BranchTransactionDO {
      */
     public void setResourceId(String resourceId) {
         this.resourceId = resourceId;
-    }
-
-    /**
-     * Gets lock key.
-     *
-     * @return the lock key
-     */
-    public String getLockKey() {
-        return lockKey;
-    }
-
-    /**
-     * Sets lock key.
-     *
-     * @param lockKey the lock key
-     */
-    public void setLockKey(String lockKey) {
-        this.lockKey = lockKey;
     }
 
     /**
@@ -270,7 +248,7 @@ public class BranchTransactionDO {
     }
 
     @Override
-    public String toString(){
+    public String toString() {
         return StringUtils.toString(this);
     }
 

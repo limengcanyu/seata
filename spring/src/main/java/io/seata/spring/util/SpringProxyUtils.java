@@ -15,13 +15,18 @@
  */
 package io.seata.spring.util;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+import io.seata.common.util.CollectionUtils;
+import io.seata.rm.tcc.remoting.parser.DubboUtil;
 import org.springframework.aop.TargetSource;
 import org.springframework.aop.framework.AdvisedSupport;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.aop.target.EmptyTargetSource;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.Proxy;
 
 /**
  * Proxy tools base on spring
@@ -29,6 +34,10 @@ import java.lang.reflect.Proxy;
  * @author zhangsen
  */
 public class SpringProxyUtils {
+
+    private SpringProxyUtils() {
+
+    }
 
     /**
      * Find target class class.
@@ -40,43 +49,41 @@ public class SpringProxyUtils {
     public static Class<?> findTargetClass(Object proxy) throws Exception {
         if (AopUtils.isAopProxy(proxy)) {
             AdvisedSupport advised = getAdvisedSupport(proxy);
-            if(AopUtils.isJdkDynamicProxy(proxy)){
+            if (AopUtils.isJdkDynamicProxy(proxy)) {
                 TargetSource targetSource = advised.getTargetSource();
-                return targetSource instanceof EmptyTargetSource ?  getFirstInterfaceByAdvised(advised): targetSource.getTarget().getClass();
+                return targetSource instanceof EmptyTargetSource ? getFirstInterfaceByAdvised(advised)
+                    : targetSource.getTargetClass();
             }
             Object target = advised.getTargetSource().getTarget();
             return findTargetClass(target);
         } else {
-            if(proxy == null){
-                return null;
-            }
-            return proxy.getClass();
+            return proxy == null ? null : proxy.getClass();
         }
     }
 
     public static Class<?>[] findInterfaces(Object proxy) throws Exception {
-        if(AopUtils.isJdkDynamicProxy(proxy)){
+        if (AopUtils.isJdkDynamicProxy(proxy)) {
             AdvisedSupport advised = getAdvisedSupport(proxy);
             return getInterfacesByAdvised(advised);
-        }else{
-            return null;
+        } else {
+            return new Class<?>[]{};
         }
     }
 
     private static Class<?>[] getInterfacesByAdvised(AdvisedSupport advised) {
         Class<?>[] interfaces = advised.getProxiedInterfaces();
-        if(interfaces.length > 0){
+        if (interfaces.length > 0) {
             return interfaces;
-        }else{
+        } else {
             throw new IllegalStateException("Find the jdk dynamic proxy class that does not implement the interface");
         }
     }
 
     private static Class<?> getFirstInterfaceByAdvised(AdvisedSupport advised) {
         Class<?>[] interfaces = advised.getProxiedInterfaces();
-        if(interfaces.length > 0){
+        if (interfaces.length > 0) {
             return interfaces[0];
-        }else{
+        } else {
             throw new IllegalStateException("Find the jdk dynamic proxy class that does not implement the interface");
         }
     }
@@ -108,17 +115,13 @@ public class SpringProxyUtils {
      * @param bean the bean
      * @return the boolean
      */
-    public static boolean isProxy(Object bean){
-        if(bean == null){
+    public static boolean isProxy(Object bean) {
+        if (bean == null) {
             return false;
         }
         //check dubbo proxy ?
-        String proxyClassName = bean.getClass().getName();
-        if(proxyClassName.startsWith("com.alibaba.dubbo.common.bytecode.proxy")
-                || proxyClassName.startsWith("org.apache.dubbo.common.bytecode.proxy") ){
-            return true;
-        }
-        return Proxy.class.isAssignableFrom(bean.getClass()) || AopUtils.isAopProxy(bean);
+        return DubboUtil.isDubboProxyName(bean.getClass().getName()) || (Proxy.class.isAssignableFrom(bean.getClass())
+                || AopUtils.isAopProxy(bean));
     }
 
     /**
@@ -129,13 +132,13 @@ public class SpringProxyUtils {
      * @throws Exception the exception
      */
     public static Class<?> getTargetInterface(Object proxy) throws Exception {
-        if(proxy == null){
+        if (proxy == null) {
             throw new java.lang.IllegalArgumentException("proxy can not be null");
         }
 
         //jdk proxy
         if (Proxy.class.isAssignableFrom(proxy.getClass())) {
-            Proxy p = (Proxy) proxy;
+            Proxy p = (Proxy)proxy;
             return p.getClass().getInterfaces()[0];
         }
 
@@ -149,28 +152,46 @@ public class SpringProxyUtils {
      * @return
      * @throws Exception
      */
-    protected static Class getTargetClass(Object proxy) throws Exception {
-        if(proxy == null){
+    protected static Class<?> getTargetClass(Object proxy) throws Exception {
+        if (proxy == null) {
             throw new java.lang.IllegalArgumentException("proxy can not be null");
         }
         //not proxy
-        if(!AopUtils.isAopProxy(proxy)) {
+        if (!AopUtils.isAopProxy(proxy)) {
             return proxy.getClass();
         }
         AdvisedSupport advisedSupport = getAdvisedSupport(proxy);
         Object target = advisedSupport.getTargetSource().getTarget();
-        /**
+        /*
          * the Proxy of sofa:reference has no target
          */
-        if (target == null ) {
-            if(advisedSupport.getProxiedInterfaces() != null && advisedSupport.getProxiedInterfaces().length > 0){
+        if (target == null) {
+            if (CollectionUtils.isNotEmpty(advisedSupport.getProxiedInterfaces())) {
                 return advisedSupport.getProxiedInterfaces()[0];
-            }else{
+            } else {
                 return proxy.getClass();
             }
-        }else{
+        } else {
             return getTargetClass(target);
         }
+    }
+
+    /**
+     * get the all interfaces of bean, if the bean is null, then return empty array
+     * @param bean
+     * @return
+     */
+    public static Class<?>[] getAllInterfaces(Object bean) {
+        Set<Class<?>> interfaces = new HashSet<>();
+        if (bean != null) {
+            Class<?> clazz = bean.getClass();
+            while (!Object.class.getName().equalsIgnoreCase(clazz.getName())) {
+                Class<?>[] clazzInterfaces = clazz.getInterfaces();
+                interfaces.addAll(Arrays.asList(clazzInterfaces));
+                clazz = clazz.getSuperclass();
+            }
+        }
+        return interfaces.toArray(new Class[0]);
     }
 
 }

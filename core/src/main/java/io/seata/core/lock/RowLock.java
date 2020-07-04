@@ -21,7 +21,6 @@ import io.seata.common.util.StringUtils;
  * The type Row lock.
  *
  * @author zhangsen
- * @data 2019 -05-15
  */
 public class RowLock {
 
@@ -186,7 +185,7 @@ public class RowLock {
     }
 
     @Override
-    public String toString(){
+    public String toString() {
         return StringUtils.toString(this);
     }
 }

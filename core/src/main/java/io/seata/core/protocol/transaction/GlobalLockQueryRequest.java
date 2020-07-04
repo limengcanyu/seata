@@ -15,19 +15,19 @@
  */
 package io.seata.core.protocol.transaction;
 
-import io.seata.core.protocol.MergedMessage;
+import io.seata.core.protocol.MessageType;
 import io.seata.core.rpc.RpcContext;
 
 /**
  * The type Global lock query request.
  *
- * @author jimin.jm @alibaba-inc.com
+ * @author slievrly
  */
-public class GlobalLockQueryRequest extends BranchRegisterRequest implements MergedMessage {
+public class GlobalLockQueryRequest extends BranchRegisterRequest  {
 
     @Override
     public short getTypeCode() {
-        return TYPE_GLOBAL_LOCK_QUERY;
+        return MessageType.TYPE_GLOBAL_LOCK_QUERY;
     }
 
     @Override

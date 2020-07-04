@@ -15,12 +15,13 @@
  */
 package io.seata.tm.api.transaction;
 
+import io.seata.common.util.CollectionUtils;
+
 import java.io.Serializable;
 import java.util.Set;
 
 /**
  * @author guoyao
- * @date 2019/4/17
  */
 public final class TransactionInfo implements Serializable {
 
@@ -32,12 +33,14 @@ public final class TransactionInfo implements Serializable {
 
     private Set<RollbackRule> rollbackRules;
 
+    private Propagation propagation;
+
     public int getTimeOut() {
         return timeOut;
     }
 
     public void setTimeOut(int timeOut) {
-        this.timeOut=timeOut;
+        this.timeOut = timeOut;
     }
 
     public String getName() {
@@ -45,7 +48,7 @@ public final class TransactionInfo implements Serializable {
     }
 
     public void setName(String name) {
-        this.name=name;
+        this.name = name;
     }
 
     public Set<RollbackRule> getRollbackRules() {
@@ -53,7 +56,7 @@ public final class TransactionInfo implements Serializable {
     }
 
     public void setRollbackRules(Set<RollbackRule> rollbackRules) {
-        this.rollbackRules=rollbackRules;
+        this.rollbackRules = rollbackRules;
     }
 
     public boolean rollbackOn(Throwable ex) {
@@ -61,7 +64,8 @@ public final class TransactionInfo implements Serializable {
         RollbackRule winner = null;
         int deepest = Integer.MAX_VALUE;
 
-        if (this.rollbackRules != null) {
+        if (CollectionUtils.isNotEmpty(rollbackRules)) {
+            winner = NoRollbackRule.DEFAULT_NO_ROLLBACK_RULE;
             for (RollbackRule rule : this.rollbackRules) {
                 int depth = rule.getDepth(ex);
                 if (depth >= 0 && depth < deepest) {
@@ -71,6 +75,18 @@ public final class TransactionInfo implements Serializable {
             }
         }
 
-        return winner == null || !(winner instanceof NoRollbackRule);
+        return !(winner instanceof NoRollbackRule);
+    }
+
+    public Propagation getPropagation() {
+        if (this.propagation != null) {
+            return this.propagation;
+        }
+        //default propagation
+        return Propagation.REQUIRED;
+    }
+
+    public void setPropagation(Propagation propagation) {
+        this.propagation = propagation;
     }
 }

@@ -15,8 +15,10 @@
  */
 package io.seata.rm.datasource.undo.mysql;
 
-import com.alibaba.druid.util.JdbcConstants;
 import io.seata.common.exception.ShouldNeverHappenException;
+import io.seata.common.util.CollectionUtils;
+import io.seata.rm.datasource.ColumnUtils;
+import io.seata.rm.datasource.SqlGenerateUtils;
 import io.seata.rm.datasource.sql.struct.Field;
 import io.seata.rm.datasource.sql.struct.Row;
 import io.seata.rm.datasource.sql.struct.TableRecords;
@@ -24,6 +26,7 @@ import io.seata.rm.datasource.undo.AbstractUndoExecutor;
 import io.seata.rm.datasource.undo.KeywordChecker;
 import io.seata.rm.datasource.undo.KeywordCheckerFactory;
 import io.seata.rm.datasource.undo.SQLUndoLog;
+import io.seata.sqlparser.util.JdbcConstants;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,9 +39,9 @@ import java.util.stream.Collectors;
 public class MySQLUndoUpdateExecutor extends AbstractUndoExecutor {
 
     /**
-     * UPDATE a SET x = ?, y = ?, z = ? WHERE pk = ?
+     * UPDATE a SET x = ?, y = ?, z = ? WHERE pk1 in (?) pk2 in (?)
      */
-    private static final String UPDATE_SQL_TEMPLATE = "UPDATE %s SET %s WHERE %s = ?";
+    private static final String UPDATE_SQL_TEMPLATE = "UPDATE %s SET %s WHERE %s ";
 
     /**
      * Undo Update.
@@ -50,17 +53,24 @@ public class MySQLUndoUpdateExecutor extends AbstractUndoExecutor {
         KeywordChecker keywordChecker = KeywordCheckerFactory.getKeywordChecker(JdbcConstants.MYSQL);
         TableRecords beforeImage = sqlUndoLog.getBeforeImage();
         List<Row> beforeImageRows = beforeImage.getRows();
-        if (beforeImageRows == null || beforeImageRows.size() == 0) {
+        if (CollectionUtils.isEmpty(beforeImageRows)) {
             throw new ShouldNeverHappenException("Invalid UNDO LOG"); // TODO
         }
         Row row = beforeImageRows.get(0);
-        Field pkField = row.primaryKeys().get(0);
+
         List<Field> nonPkFields = row.nonPrimaryKeys();
+        // update sql undo log before image all field come from table meta. need add escape.
+        // see BaseTransactionalExecutor#buildTableRecords
         String updateColumns = nonPkFields.stream()
-            .map(field -> keywordChecker.checkAndReplace(field.getName()) + " = ?")
+            .map(field -> ColumnUtils.addEscape(field.getName(), JdbcConstants.MYSQL) + " = ?")
             .collect(Collectors.joining(", "));
-        return String.format(UPDATE_SQL_TEMPLATE, keywordChecker.checkAndReplace(sqlUndoLog.getTableName()),
-                             updateColumns, keywordChecker.checkAndReplace(pkField.getName()));
+
+        List<String> pkNameList = getOrderedPkList(beforeImage,row,JdbcConstants.MYSQL)
+                .stream().map(e -> e.getName())
+                .collect(Collectors.toList());
+        String whereSql = SqlGenerateUtils.buildWhereConditionByPKs(pkNameList,keywordChecker);
+
+        return String.format(UPDATE_SQL_TEMPLATE, sqlUndoLog.getTableName(),updateColumns, whereSql);
     }
 
     /**

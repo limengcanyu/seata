@@ -21,7 +21,6 @@ import io.seata.common.util.StringUtils;
  * database type
  *
  * @author zhangsen
- * @data 2019 /4/2
  */
 public enum DBType {
 
@@ -81,9 +80,9 @@ public enum DBType {
      * @param dbType the db type
      * @return the db type
      */
-    public static DBType valueof (String dbType){
-        for(DBType dt : values()){
-            if(StringUtils.equalsIgnoreCase(dt.name(),dbType)){
+    public static DBType valueof(String dbType) {
+        for (DBType dt : values()) {
+            if (StringUtils.equalsIgnoreCase(dt.name(), dbType)) {
                 return dt;
             }
         }

@@ -15,67 +15,32 @@
  */
 package io.seata.core.rpc.netty;
 
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeoutException;
-
-import io.seata.common.util.NetUtil;
+import io.netty.channel.Channel;
 import io.seata.core.protocol.HeartbeatMessage;
-import io.seata.core.protocol.RegisterRMRequest;
-import io.seata.core.protocol.RegisterTMRequest;
+import io.seata.core.protocol.MessageType;
 import io.seata.core.protocol.RpcMessage;
 import io.seata.core.rpc.ChannelManager;
-import io.seata.core.rpc.DefaultServerMessageListenerImpl;
-import io.seata.core.rpc.RpcContext;
-import io.seata.core.rpc.ServerMessageListener;
-import io.seata.core.rpc.ServerMessageSender;
-import io.seata.core.rpc.TransactionMessageHandler;
-
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandler.Sharable;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.timeout.IdleState;
-import io.netty.handler.timeout.IdleStateEvent;
+import io.seata.core.rpc.processor.server.RegRmProcessor;
+import io.seata.core.rpc.processor.server.RegTmProcessor;
+import io.seata.core.rpc.processor.server.ServerHeartbeatProcessor;
+import io.seata.core.rpc.processor.server.ServerOnRequestProcessor;
+import io.seata.core.rpc.processor.server.ServerOnResponseProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeoutException;
 
 /**
  * The type Abstract rpc server.
  *
- * @author jimin.jm @alibaba-inc.com
- * @date 2018 /10/15
+ * @author slievrly
+ * @author zhangchenghui.dev@gmail.com
  */
-@Sharable
-public class RpcServer extends AbstractRpcRemotingServer implements ServerMessageSender {
+public class RpcServer extends AbstractRpcRemotingServer {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(RpcServer.class);
 
-    /**
-     * The Server message listener.
-     */
-    protected ServerMessageListener serverMessageListener;
-
-    private TransactionMessageHandler transactionMessageHandler;
-    private RegisterCheckAuthHandler checkAuthHandler;
-
-    /**
-     * Sets transactionMessageHandler.
-     *
-     * @param transactionMessageHandler the transactionMessageHandler
-     */
-    public void setHandler(TransactionMessageHandler transactionMessageHandler) {
-        setHandler(transactionMessageHandler, null);
-    }
-
-    /**
-     * Sets transactionMessageHandler.
-     *
-     * @param transactionMessageHandler the transactionMessageHandler
-     * @param checkAuthHandler          the check auth handler
-     */
-    public void setHandler(TransactionMessageHandler transactionMessageHandler,
-                           RegisterCheckAuthHandler checkAuthHandler) {
-        this.transactionMessageHandler = transactionMessageHandler;
-        this.checkAuthHandler = checkAuthHandler;
-    }
 
     /**
      * Instantiates a new Abstract rpc server.
@@ -83,36 +48,7 @@ public class RpcServer extends AbstractRpcRemotingServer implements ServerMessag
      * @param messageExecutor the message executor
      */
     public RpcServer(ThreadPoolExecutor messageExecutor) {
-        super(new NettyServerConfig(), messageExecutor);
-    }
-
-    /**
-     * Gets server message listener.
-     *
-     * @return the server message listener
-     */
-    public ServerMessageListener getServerMessageListener() {
-        return serverMessageListener;
-    }
-
-    /**
-     * Sets server message listener.
-     *
-     * @param serverMessageListener the server message listener
-     */
-    public void setServerMessageListener(ServerMessageListener serverMessageListener) {
-        this.serverMessageListener = serverMessageListener;
-    }
-
-    /**
-     * Debug log.
-     *
-     * @param info the info
-     */
-    public void debugLog(String info) {
-        if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug(info);
-        }
+        super(messageExecutor, new NettyServerConfig());
     }
 
     /**
@@ -120,49 +56,10 @@ public class RpcServer extends AbstractRpcRemotingServer implements ServerMessag
      */
     @Override
     public void init() {
+        // registry processor
+        registerProcessor();
+        setChannelHandlers(new ServerHandler());
         super.init();
-        setChannelHandlers(RpcServer.this);
-        DefaultServerMessageListenerImpl defaultServerMessageListenerImpl = new DefaultServerMessageListenerImpl(
-            transactionMessageHandler);
-        defaultServerMessageListenerImpl.init();
-        defaultServerMessageListenerImpl.setServerMessageSender(this);
-        this.setServerMessageListener(defaultServerMessageListenerImpl);
-        super.start();
-
-    }
-
-    private void closeChannelHandlerContext(ChannelHandlerContext ctx) {
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info("closeChannelHandlerContext channel:" + ctx.channel());
-        }
-        ctx.disconnect();
-        ctx.close();
-    }
-
-    /**
-     * User event triggered.
-     *
-     * @param ctx the ctx
-     * @param evt the evt
-     * @throws Exception the exception
-     */
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-        if (evt instanceof IdleStateEvent) {
-            debugLog("idle:" + evt);
-            IdleStateEvent idleStateEvent = (IdleStateEvent)evt;
-            if (idleStateEvent.state() == IdleState.READER_IDLE) {
-                if (LOGGER.isInfoEnabled()) {
-                    LOGGER.info("channel:" + ctx.channel() + " read idle.");
-                }
-                handleDisconnect(ctx);
-                try {
-                    closeChannelHandlerContext(ctx);
-                } catch (Exception e) {
-                    LOGGER.error(e.getMessage());
-                }
-            }
-        }
     }
 
     /**
@@ -171,28 +68,28 @@ public class RpcServer extends AbstractRpcRemotingServer implements ServerMessag
     @Override
     public void destroy() {
         super.destroy();
-        super.shutdown();
         if (LOGGER.isInfoEnabled()) {
             LOGGER.info("destroyed rpcServer");
         }
     }
 
+
     /**
      * Send response.
      * rm reg,rpc reg,inner response
      *
-     * @param msgId   the msg id
+     * @param request the request
      * @param channel the channel
      * @param msg     the msg
      */
     @Override
-    public void sendResponse(long msgId, Channel channel, Object msg) {
+    public void sendResponse(RpcMessage request, Channel channel, Object msg) {
         Channel clientChannel = channel;
         if (!(msg instanceof HeartbeatMessage)) {
             clientChannel = ChannelManager.getSameClientChannel(channel);
         }
         if (clientChannel != null) {
-            super.sendResponse(msgId, clientChannel, msg);
+            super.defaultSendResponse(request, clientChannel, msg);
         } else {
             throw new RuntimeException("channel is error. channel:" + clientChannel);
         }
@@ -223,6 +120,39 @@ public class RpcServer extends AbstractRpcRemotingServer implements ServerMessag
 
     /**
      * Send request with response object.
+     * send syn request for rm
+     *
+     * @param clientChannel the client channel
+     * @param message       the message
+     * @return the object
+     * @throws TimeoutException the timeout exception
+     */
+    @Override
+    public Object sendSyncRequest(Channel clientChannel, Object message) throws TimeoutException {
+        return sendSyncRequest(clientChannel, message, NettyServerConfig.getRpcRequestTimeout());
+    }
+
+    /**
+     * Send request with response object.
+     * send syn request for rm
+     *
+     * @param clientChannel the client channel
+     * @param message       the message
+     * @param timeout       the timeout
+     * @return the object
+     * @throws TimeoutException the timeout exception
+     */
+    @Override
+    public Object sendSyncRequest(Channel clientChannel, Object message, long timeout) throws TimeoutException {
+        if (clientChannel == null) {
+            throw new RuntimeException("rm client is not connected");
+
+        }
+        return sendAsyncRequestWithResponse(null, clientChannel, message, timeout);
+    }
+
+    /**
+     * Send request with response object.
      *
      * @param resourceId the db key
      * @param clientId   the client ip
@@ -237,107 +167,44 @@ public class RpcServer extends AbstractRpcRemotingServer implements ServerMessag
     }
 
     /**
-     * Dispatch.
+     * Send request with response object.
      *
-     * @param msgId the msg id
-     * @param ctx   the ctx
-     * @param msg   the msg
+     * @param channel the channel
+     * @param message the msg
+     * @return the object
+     * @throws TimeoutException the timeout exception
      */
     @Override
-    public void dispatch(long msgId, ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof RegisterRMRequest) {
-            serverMessageListener.onRegRmMessage(msgId, ctx, (RegisterRMRequest)msg, this,
-                checkAuthHandler);
-        } else {
-            if (ChannelManager.isRegistered(ctx.channel())) {
-                serverMessageListener.onTrxMessage(msgId, ctx, msg, this);
-            } else {
-                try {
-                    closeChannelHandlerContext(ctx);
-                } catch (Exception exx) {
-                    LOGGER.error(exx.getMessage());
-                }
-                if (LOGGER.isInfoEnabled()) {
-                    LOGGER.info(String.format("close a unhandled connection! [%s]", ctx.channel().toString()));
-                }
-            }
-        }
+    public Object sendASyncRequest(Channel channel, Object message) throws TimeoutException {
+        return sendAsyncRequestWithoutResponse(channel, message);
     }
 
-    /**
-     * Channel inactive.
-     *
-     * @param ctx the ctx
-     * @throws Exception the exception
-     */
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        debugLog("inactive:" + ctx);
-        if (messageExecutor.isShutdown()) {
-            return;
-        }
-        handleDisconnect(ctx);
-        super.channelInactive(ctx);
-    }
-
-    private void handleDisconnect(ChannelHandlerContext ctx) {
-        final String ipAndPort = NetUtil.toStringAddress(ctx.channel().remoteAddress());
-        RpcContext rpcContext = ChannelManager.getContextFromIdentified(ctx.channel());
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info(ipAndPort + " to server channel inactive.");
-        }
-        if (null != rpcContext && null != rpcContext.getClientRole()) {
-            rpcContext.release();
-            if (LOGGER.isInfoEnabled()) {
-                LOGGER.info("remove channel:" + ctx.channel() + "context:" + rpcContext);
-            }
-        } else {
-            if (LOGGER.isInfoEnabled()) {
-                LOGGER.info("remove unused channel:" + ctx.channel());
-            }
-        }
-    }
-
-    /**
-     * Channel read.
-     *
-     * @param ctx the ctx
-     * @param msg the msg
-     * @throws Exception the exception
-     */
-    @Override
-    public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (msg instanceof RpcMessage) {
-            RpcMessage rpcMessage = (RpcMessage)msg;
-            debugLog("read:" + rpcMessage.getBody().toString());
-            if (rpcMessage.getBody() instanceof RegisterTMRequest) {
-                RegisterTMRequest request
-                    = (RegisterTMRequest)rpcMessage
-                    .getBody();
-                serverMessageListener.onRegTmMessage(rpcMessage.getId(), ctx, request, this, checkAuthHandler);
-                return;
-            }
-            if (rpcMessage.getBody() == HeartbeatMessage.PING) {
-                serverMessageListener.onCheckMessage(rpcMessage.getId(), ctx, this);
-                return;
-            }
-        }
-        super.channelRead(ctx, msg);
-    }
-
-    /**
-     * Exception caught.
-     *
-     * @param ctx   the ctx
-     * @param cause the cause
-     * @throws Exception the exception
-     */
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        if (LOGGER.isInfoEnabled()) {
-            LOGGER.info("channel exx:" + cause.getMessage() + ",channel:" + ctx.channel());
-        }
-        ChannelManager.releaseRpcContext(ctx.channel());
-        super.exceptionCaught(ctx, cause);
+    private void registerProcessor() {
+        // 1. registry on request message processor
+        ServerOnRequestProcessor onRequestProcessor =
+            new ServerOnRequestProcessor(this, getTransactionMessageHandler());
+        super.registerProcessor(MessageType.TYPE_BRANCH_REGISTER, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_BRANCH_STATUS_REPORT, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_GLOBAL_BEGIN, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_GLOBAL_COMMIT, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_GLOBAL_LOCK_QUERY, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_GLOBAL_REPORT, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_GLOBAL_ROLLBACK, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_GLOBAL_STATUS, onRequestProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_SEATA_MERGE, onRequestProcessor, messageExecutor);
+        // 2. registry on response message processor
+        ServerOnResponseProcessor onResponseProcessor =
+            new ServerOnResponseProcessor(getTransactionMessageHandler(), getFutures());
+        super.registerProcessor(MessageType.TYPE_BRANCH_COMMIT_RESULT, onResponseProcessor, messageExecutor);
+        super.registerProcessor(MessageType.TYPE_BRANCH_ROLLBACK_RESULT, onResponseProcessor, messageExecutor);
+        // 3. registry rm message processor
+        RegRmProcessor regRmProcessor = new RegRmProcessor(this);
+        super.registerProcessor(MessageType.TYPE_REG_RM, regRmProcessor, messageExecutor);
+        // 4. registry tm message processor
+        RegTmProcessor regTmProcessor = new RegTmProcessor(this);
+        super.registerProcessor(MessageType.TYPE_REG_CLT, regTmProcessor, null);
+        // 5. registry heartbeat message processor
+        ServerHeartbeatProcessor heartbeatMessageProcessor = new ServerHeartbeatProcessor(this);
+        super.registerProcessor(MessageType.TYPE_HEARTBEAT_MSG, heartbeatMessageProcessor, null);
     }
 }

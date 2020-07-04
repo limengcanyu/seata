@@ -15,17 +15,18 @@
  */
 package io.seata.core.protocol.transaction;
 
+import io.seata.core.protocol.MessageType;
 import io.seata.core.rpc.RpcContext;
 
 /**
  * The type Global commit request.
  *
- * @author jimin.jm @alibaba-inc.com
+ * @author slievrly
  */
 public class GlobalCommitRequest extends AbstractGlobalEndRequest {
     @Override
     public short getTypeCode() {
-        return TYPE_GLOBAL_COMMIT;
+        return MessageType.TYPE_GLOBAL_COMMIT;
     }
 
     @Override

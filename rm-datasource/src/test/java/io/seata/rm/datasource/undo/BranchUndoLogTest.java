@@ -18,12 +18,11 @@ package io.seata.rm.datasource.undo;
 import java.sql.Types;
 import java.util.ArrayList;
 
-import io.seata.rm.datasource.sql.SQLType;
+import io.seata.sqlparser.SQLType;
 import io.seata.rm.datasource.sql.struct.Field;
 import io.seata.rm.datasource.sql.struct.Row;
 import io.seata.rm.datasource.sql.struct.TableMeta;
 import io.seata.rm.datasource.sql.struct.TableRecords;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -68,10 +67,9 @@ public class BranchUndoLogTest {
 
         branchUndoLog.setSqlUndoLogs(items);
 
-        String encodeString = UndoLogParserFactory.getInstance().encode(branchUndoLog);
-        System.out.println(encodeString);
+        byte[] bs = UndoLogParserFactory.getInstance().encode(branchUndoLog);
 
-        BranchUndoLog decodeObj = UndoLogParserFactory.getInstance().decode(encodeString);
+        BranchUndoLog decodeObj = UndoLogParserFactory.getInstance().decode(bs);
         Assertions.assertEquals(decodeObj.getBranchId(), branchUndoLog.getBranchId());
 
     }

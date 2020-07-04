@@ -15,15 +15,17 @@
  */
 package io.seata.core.protocol.transaction;
 
+import io.seata.core.protocol.MessageType;
+
 /**
  * The type Global rollback response.
  *
- * @author jimin.jm @alibaba-inc.com
+ * @author slievrly
  */
 public class GlobalRollbackResponse extends AbstractGlobalEndResponse {
 
     @Override
     public short getTypeCode() {
-        return TYPE_GLOBAL_ROLLBACK_RESULT;
+        return MessageType.TYPE_GLOBAL_ROLLBACK_RESULT;
     }
 }

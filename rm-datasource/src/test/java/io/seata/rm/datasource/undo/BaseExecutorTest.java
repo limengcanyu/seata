@@ -22,12 +22,12 @@ import io.seata.rm.datasource.sql.struct.Row;
 /**
  * @author Geng Zhang
  */
-public class BaseExecutorTest {
+public abstract class BaseExecutorTest {
 
     protected static Field addField(Row row, String name, int type, Object value) {
         Field field = new Field(name, type, value);
         if (name.equalsIgnoreCase("id")) {
-            field.setKeyType(KeyType.PrimaryKey);
+            field.setKeyType(KeyType.PRIMARY_KEY);
         }
         row.add(field);
         return field;

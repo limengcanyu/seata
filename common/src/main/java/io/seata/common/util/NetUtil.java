@@ -15,6 +15,9 @@
  */
 package io.seata.common.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -22,14 +25,10 @@ import java.net.SocketAddress;
 import java.util.Enumeration;
 import java.util.regex.Pattern;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * The type Net util.
  *
- * @author jimin.jm @alibaba-inc.com
- * @date 2018 /10/10
+ * @author slievrly
  */
 public class NetUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(NetUtil.class);
@@ -48,7 +47,10 @@ public class NetUtil {
      * @return the string
      */
     public static String toStringAddress(SocketAddress address) {
-        return toStringAddress((InetSocketAddress)address);
+        if (address == null) {
+            return StringUtils.EMPTY;
+        }
+        return toStringAddress((InetSocketAddress) address);
     }
 
     /**
@@ -58,7 +60,7 @@ public class NetUtil {
      * @return the string
      */
     public static String toIpAddress(SocketAddress address) {
-        InetSocketAddress inetSocketAddress = (InetSocketAddress)address;
+        InetSocketAddress inetSocketAddress = (InetSocketAddress) address;
         return inetSocketAddress.getAddress().getHostAddress();
     }
 
@@ -152,7 +154,7 @@ public class NetUtil {
                 return localAddress;
             }
         } catch (Throwable e) {
-            LOGGER.warn("Failed to retrieving ip address, " + e.getMessage(), e);
+            LOGGER.warn("Failed to retrieving ip address, {}", e.getMessage(), e);
         }
         try {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
@@ -169,17 +171,17 @@ public class NetUtil {
                                         return address;
                                     }
                                 } catch (Throwable e) {
-                                    LOGGER.warn("Failed to retrieving ip address, " + e.getMessage(), e);
+                                    LOGGER.warn("Failed to retrieving ip address, {}", e.getMessage(), e);
                                 }
                             }
                         }
                     } catch (Throwable e) {
-                        LOGGER.warn("Failed to retrieving ip address, " + e.getMessage(), e);
+                        LOGGER.warn("Failed to retrieving ip address, {}", e.getMessage(), e);
                     }
                 }
             }
         } catch (Throwable e) {
-            LOGGER.warn("Failed to retrieving ip address, " + e.getMessage(), e);
+            LOGGER.warn("Failed to retrieving ip address, {}", e.getMessage(), e);
         }
         LOGGER.error("Could not get local host ip address, will use 127.0.0.1 instead.");
         return localAddress;
@@ -191,17 +193,37 @@ public class NetUtil {
      * @param address the address
      */
     public static void validAddress(InetSocketAddress address) {
-        if (null == address.getHostName() || 0 == address.getPort()) {
+        if (address.getHostName() == null || 0 == address.getPort()) {
             throw new IllegalArgumentException("invalid address:" + address);
         }
     }
 
+    /**
+     * is valid address
+     *
+     * @param address
+     * @return true if the given address is valid
+     */
     private static boolean isValidAddress(InetAddress address) {
         if (address == null || address.isLoopbackAddress()) {
             return false;
         }
-        String name = address.getHostAddress();
-        return (name != null && !ANY_HOST.equals(name) && !LOCALHOST.equals(name) && IP_PATTERN.matcher(name)
-            .matches());
+        return isValidIp(address.getHostAddress(), false);
+    }
+
+    /**
+     * is valid IP
+     *
+     * @param ip
+     * @param validLocalAndAny Are 127.0.0.1 and 0.0.0.0 valid IPs?
+     * @return true if the given IP is valid
+     */
+    public static boolean isValidIp(String ip, boolean validLocalAndAny) {
+        if (validLocalAndAny) {
+            return ip != null && IP_PATTERN.matcher(ip).matches();
+        } else {
+            return ip != null && !ANY_HOST.equals(ip) && !LOCALHOST.equals(ip) && IP_PATTERN.matcher(ip).matches();
+        }
+
     }
 }
